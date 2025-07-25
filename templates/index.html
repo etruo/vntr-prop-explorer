@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kansas Property Lookup</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .main-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            margin: 2rem auto;
+            max-width: 1200px;
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #1f77b4 0%, #0d5aa7 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+        .content {
+            padding: 2rem;
+        }
+        .search-container {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+        .form-control {
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+            padding: 12px 20px;
+            font-size: 16px;
+        }
+        .form-control:focus {
+            border-color: #1f77b4;
+            box-shadow: 0 0 0 0.2rem rgba(31, 119, 180, 0.25);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #1f77b4 0%, #0d5aa7 100%);
+            border: none;
+            border-radius: 10px;
+            padding: 12px 30px;
+            font-weight: 600;
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #0d5aa7 0%, #1f77b4 100%);
+            transform: translateY(-2px);
+        }
+        .suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            z-index: 1000;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .suggestion-item {
+            padding: 12px 20px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            transition: background-color 0.2s;
+        }
+        .suggestion-item:hover {
+            background-color: #f8f9fa;
+        }
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+        .property-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+        .metric {
+            text-align: center;
+            padding: 1rem;
+        }
+        .metric-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #1f77b4;
+        }
+        .metric-label {
+            color: #666;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .map-container {
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            border-radius: 10px;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        .search-input-container {
+            position: relative;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="main-container">
+            <div class="header">
+                <h1><i class="fas fa-home"></i> Kansas Property Lookup</h1>
+                <p class="mb-0">Find property details and county appraisals</p>
+            </div>
+            
+            <div class="content">
+                <div class="search-container">
+                    <h3><i class="fas fa-search"></i> Property Search</h3>
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="search-input-container">
+                                <input type="text" 
+                                       id="addressInput" 
+                                       class="form-control" 
+                                       placeholder="Enter property address (e.g., 1901 N Paddock Green St, Wichita, KS)"
+                                       autocomplete="off">
+                                <div id="suggestions" class="suggestions" style="display: none;"></div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <button id="searchBtn" class="btn btn-primary w-100">
+                                <i class="fas fa-search"></i> Lookup Property
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="loading" class="loading">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-3">Looking up property details...</p>
+                </div>
+                
+                <div id="error" class="error" style="display: none;"></div>
+                
+                <div id="results" style="display: none;">
+                    <div class="property-card">
+                        <h3><i class="fas fa-info-circle"></i> Property Details</h3>
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="metric">
+                                    <div class="metric-value" id="unitType">-</div>
+                                    <div class="metric-label">Unit Type</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="metric">
+                                    <div class="metric-value" id="sqft">-</div>
+                                    <div class="metric-label">Square Feet</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="metric">
+                                    <div class="metric-value" id="lotSize">-</div>
+                                    <div class="metric-label">Lot Size</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="metric">
+                                    <div class="metric-value" id="appraisal">-</div>
+                                    <div class="metric-label">County Appraisal</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="property-card">
+                        <h3><i class="fas fa-map-marker-alt"></i> Property Location</h3>
+                        <div class="map-container">
+                            <div id="map"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let searchTimeout;
+        const addressInput = document.getElementById('addressInput');
+        const suggestionsDiv = document.getElementById('suggestions');
+        const searchBtn = document.getElementById('searchBtn');
+        const loading = document.getElementById('loading');
+        const error = document.getElementById('error');
+        const results = document.getElementById('results');
+
+        // Autocomplete functionality
+        addressInput.addEventListener('input', function() {
+            const query = this.value.trim();
+            
+            clearTimeout(searchTimeout);
+            
+            if (query.length < 3) {
+                suggestionsDiv.style.display = 'none';
+                return;
+            }
+            
+            searchTimeout = setTimeout(() => {
+                fetchSuggestions(query);
+            }, 300);
+        });
+
+        async function fetchSuggestions(query) {
+            try {
+                const response = await fetch(`/api/autocomplete?query=${encodeURIComponent(query)}`);
+                const suggestions = await response.json();
+                
+                if (suggestions.length > 0) {
+                    displaySuggestions(suggestions);
+                } else {
+                    suggestionsDiv.style.display = 'none';
+                }
+            } catch (err) {
+                console.error('Error fetching suggestions:', err);
+            }
+        }
+
+        function displaySuggestions(suggestions) {
+            suggestionsDiv.innerHTML = '';
+            
+            suggestions.forEach(suggestion => {
+                const item = document.createElement('div');
+                item.className = 'suggestion-item';
+                item.textContent = suggestion;
+                item.addEventListener('click', () => {
+                    addressInput.value = suggestion;
+                    suggestionsDiv.style.display = 'none';
+                });
+                suggestionsDiv.appendChild(item);
+            });
+            
+            suggestionsDiv.style.display = 'block';
+        }
+
+        // Hide suggestions when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!addressInput.contains(e.target) && !suggestionsDiv.contains(e.target)) {
+                suggestionsDiv.style.display = 'none';
+            }
+        });
+
+        // Search functionality
+        searchBtn.addEventListener('click', performSearch);
+        addressInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                performSearch();
+            }
+        });
+
+        async function performSearch() {
+            const address = addressInput.value.trim();
+            
+            if (!address) {
+                showError('Please enter a property address');
+                return;
+            }
+            
+            hideError();
+            showLoading();
+            hideResults();
+            
+            try {
+                const response = await fetch(`/api/lookup?address=${encodeURIComponent(address)}`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    showError(data.error);
+                } else {
+                    displayResults(data);
+                }
+            } catch (err) {
+                showError('Failed to lookup property. Please try again.');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function displayResults(data) {
+            const property = data.property;
+            
+            // Update property details
+            document.getElementById('unitType').textContent = property.unit_type;
+            document.getElementById('sqft').textContent = property.sqft.toLocaleString();
+            document.getElementById('lotSize').textContent = property.lot_size.toLocaleString() + ' sq ft';
+            document.getElementById('appraisal').textContent = '$' + property.county_appraisal.toLocaleString();
+            
+            // Update map
+            document.getElementById('map').innerHTML = data.map;
+            
+            showResults();
+        }
+
+        function showLoading() {
+            loading.style.display = 'block';
+        }
+
+        function hideLoading() {
+            loading.style.display = 'none';
+        }
+
+        function showError(message) {
+            error.textContent = message;
+            error.style.display = 'block';
+        }
+
+        function hideError() {
+            error.style.display = 'none';
+        }
+
+        function showResults() {
+            results.style.display = 'block';
+        }
+
+        function hideResults() {
+            results.style.display = 'none';
+        }
+    </script>
+</body>
+</html> 
